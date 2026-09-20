@@ -1,0 +1,28 @@
+import { Boolean, Group, Integer, Level, Options, Text, text } from "../../log";
+import go fmt from "fmt";
+import go os from "os";
+
+function main(): void {
+  const options = Options {
+    minimumLevel: Level.Debug,
+    includeTime: false,
+  };
+  const [logger, loggerError] = text(os.Stdout, options);
+  if (loggerError !== nil) {
+    fmt.Println("error:", loggerError.Error());
+    return;
+  }
+  const [request, groupError] = Group("request", [
+    Text("method", "GET"),
+    Integer("status", 200),
+  ]);
+  if (groupError !== nil) {
+    fmt.Println("error:", groupError.Error());
+    return;
+  }
+  const application = logger.withFields([Text("component", "api")]);
+  const [writeError] = application.info("request completed", [request, Boolean("cached", true)]);
+  if (writeError !== nil) {
+    fmt.Println("error:", writeError.Error());
+  }
+}

@@ -1,0 +1,6 @@
+/.kinmokusei/
+/build/
+/dist/
+*.out
+*.exe
+coverage.out

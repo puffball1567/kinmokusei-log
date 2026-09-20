@@ -1,0 +1,323 @@
+import go stdjson from "encoding/json";
+import go errors from "errors";
+import go io from "io";
+import go os from "os";
+import go strconv from "strconv";
+import go strings from "strings";
+import go sync from "sync";
+import go time from "time";
+
+export enum Level {
+  Debug,
+  Info,
+  Warn,
+  Error,
+}
+
+export struct Options {
+  public minimumLevel: Level;
+  public includeTime: boolean;
+}
+
+enum OutputKind {
+  Text,
+  JSON,
+}
+
+enum FieldKind {
+  Text,
+  Integer,
+  Integer64,
+  Number,
+  Boolean,
+  Error,
+  Group,
+}
+
+export struct Field {
+  private name: string;
+  private kind: FieldKind;
+  private textValue: string;
+  private integerValue: int;
+  private integer64Value: int64;
+  private numberValue: float64;
+  private booleanValue: boolean;
+  private groupTextValue: string;
+  private groupJSONValue: string;
+}
+
+export function defaultOptions(): Options {
+  return Options {
+    minimumLevel: Level.Info,
+    includeTime: true,
+  };
+}
+
+export function Text(name: string, value: string): Field {
+  return field(name, FieldKind.Text, value, 0, 0, 0.0, false, "", "");
+}
+
+export function Integer(name: string, value: int): Field {
+  return field(name, FieldKind.Integer, "", value, 0, 0.0, false, "", "");
+}
+
+export function Integer64(name: string, value: int64): Field {
+  return field(name, FieldKind.Integer64, "", 0, value, 0.0, false, "", "");
+}
+
+export function Number(name: string, value: float64): Field {
+  return field(name, FieldKind.Number, "", 0, 0, value, false, "", "");
+}
+
+export function Boolean(name: string, value: boolean): Field {
+  return field(name, FieldKind.Boolean, "", 0, 0, 0.0, value, "", "");
+}
+
+export function Error(name: string, value: error): Field {
+  if (value === nil) {
+    return field(name, FieldKind.Error, "<nil>", 0, 0, 0.0, false, "", "");
+  }
+  return field(name, FieldKind.Error, value.Error(), 0, 0, 0.0, false, "", "");
+}
+
+export function Group(name: string, fields: Field[]): Result<Field> {
+  let textParts: string[] = [];
+  let jsonParts: string[] = [];
+  for (const value of fields) {
+    textParts = append(textParts, textField(value));
+    const encoded = jsonField(value)?;
+    jsonParts = append(jsonParts, encoded);
+  }
+  return ok(field(name, FieldKind.Group, "", 0, 0, 0.0, false, strings.Join(textParts, " "), "{" + strings.Join(jsonParts, ",") + "}"));
+}
+
+export class Logger {
+  private writer: io.Writer;
+  private mutex: *sync.Mutex;
+  private outputKind: OutputKind;
+  private options: Options;
+  private fields: Field[];
+
+  constructor(writer: io.Writer, mutex: *sync.Mutex, outputKind: OutputKind, options: Options, fields: Field[]) {
+    this.writer = writer;
+    this.mutex = mutex;
+    this.outputKind = outputKind;
+    this.options = options;
+    this.fields = fields;
+  }
+
+  public function enabled(level: Level): boolean {
+    return levelRank(level) >= levelRank(this.options.minimumLevel);
+  }
+
+  public function log(level: Level, message: string, fields: Field[]): Result<void> {
+    if (!this.enabled(level)) {
+      return ok();
+    }
+    let combined = copyFields(this.fields);
+    for (const value of fields) {
+      combined = append(combined, value);
+    }
+
+    let line = "";
+    if (this.outputKind == OutputKind.JSON) {
+      const encoded = encodeJSON(level, message, combined, this.options.includeTime)?;
+      line = encoded;
+    } else {
+      line = encodeText(level, message, combined, this.options.includeTime);
+    }
+    line += "\n";
+
+    this.mutex.Lock();
+    defer this.mutex.Unlock();
+    const [written, writeError] = io.WriteString(this.writer, line);
+    if (writeError !== nil) {
+      return fail(writeError);
+    }
+    if (written != len(line)) {
+      return fail(io.ErrShortWrite);
+    }
+    return ok();
+  }
+
+  public function debug(message: string, fields: Field[]): Result<void> {
+    return this.log(Level.Debug, message, fields);
+  }
+
+  public function info(message: string, fields: Field[]): Result<void> {
+    return this.log(Level.Info, message, fields);
+  }
+
+  public function warn(message: string, fields: Field[]): Result<void> {
+    return this.log(Level.Warn, message, fields);
+  }
+
+  public function error(message: string, fields: Field[]): Result<void> {
+    return this.log(Level.Error, message, fields);
+  }
+
+  public function withFields(fields: Field[]): Logger {
+    let combined = copyFields(this.fields);
+    for (const value of fields) {
+      combined = append(combined, value);
+    }
+    return new Logger(this.writer, this.mutex, this.outputKind, this.options, combined);
+  }
+}
+
+export function text(writer: io.Writer, options: Options): Result<Logger> {
+  if (writer === nil) {
+    return fail(errors.New("log writer must not be nil"));
+  }
+  const mutex = sync.Mutex {};
+  return ok(new Logger(writer, &mutex, OutputKind.Text, options, []));
+}
+
+export function json(writer: io.Writer, options: Options): Result<Logger> {
+  if (writer === nil) {
+    return fail(errors.New("log writer must not be nil"));
+  }
+  const mutex = sync.Mutex {};
+  return ok(new Logger(writer, &mutex, OutputKind.JSON, options, []));
+}
+
+export function stderr(options: Options): Logger {
+  const [logger, _] = text(os.Stderr, options);
+  return logger;
+}
+
+function field(name: string, kind: FieldKind, textValue: string, integerValue: int, integer64Value: int64, numberValue: float64, booleanValue: boolean, groupTextValue: string, groupJSONValue: string): Field {
+  return Field {
+    name: name,
+    kind: kind,
+    textValue: textValue,
+    integerValue: integerValue,
+    integer64Value: integer64Value,
+    numberValue: numberValue,
+    booleanValue: booleanValue,
+    groupTextValue: groupTextValue,
+    groupJSONValue: groupJSONValue,
+  };
+}
+
+function copyFields(source: Field[]): Field[] {
+  let copied: Field[] = [];
+  for (const value of source) {
+    copied = append(copied, value);
+  }
+  return copied;
+}
+
+function levelRank(level: Level): int {
+  if (level == Level.Debug) {
+    return 0;
+  }
+  if (level == Level.Info) {
+    return 1;
+  }
+  if (level == Level.Warn) {
+    return 2;
+  }
+  return 3;
+}
+
+function levelName(level: Level): string {
+  if (level == Level.Debug) {
+    return "DEBUG";
+  }
+  if (level == Level.Warn) {
+    return "WARN";
+  }
+  if (level == Level.Error) {
+    return "ERROR";
+  }
+  return "INFO";
+}
+
+function encodeText(level: Level, message: string, fields: Field[], includeTime: boolean): string {
+  let parts: string[] = [];
+  if (includeTime) {
+    parts = append(parts, "time=" + strconv.Quote(time.Now().UTC().Format(time.RFC3339Nano)));
+  }
+  parts = append(parts, "level=" + levelName(level));
+  parts = append(parts, "message=" + strconv.Quote(message));
+  for (const value of fields) {
+    parts = append(parts, textField(value));
+  }
+  return strings.Join(parts, " ");
+}
+
+function textField(value: Field): string {
+  if (value.kind == FieldKind.Integer) {
+    return value.name + "=" + strconv.Itoa(value.integerValue);
+  }
+  if (value.kind == FieldKind.Integer64) {
+    return value.name + "=" + strconv.FormatInt(value.integer64Value, 10);
+  }
+  if (value.kind == FieldKind.Number) {
+    return value.name + "=" + strconv.FormatFloat(value.numberValue, "g"[0], -1, 64);
+  }
+  if (value.kind == FieldKind.Boolean) {
+    return value.name + "=" + strconv.FormatBool(value.booleanValue);
+  }
+  if (value.kind == FieldKind.Group) {
+    return value.name + "={" + value.groupTextValue + "}";
+  }
+  return value.name + "=" + strconv.Quote(value.textValue);
+}
+
+function encodeJSON(level: Level, message: string, fields: Field[], includeTime: boolean): Result<string> {
+  let parts: string[] = [];
+  if (includeTime) {
+    const encodedTime = encodeJSONString(time.Now().UTC().Format(time.RFC3339Nano));
+    parts = append(parts, "\"time\":" + encodedTime);
+  }
+  const encodedLevel = encodeJSONString(levelName(level));
+  const encodedMessage = encodeJSONString(message);
+  parts = append(parts, "\"level\":" + encodedLevel);
+  parts = append(parts, "\"message\":" + encodedMessage);
+  if (len(fields) > 0) {
+    let fieldParts: string[] = [];
+    for (const value of fields) {
+      const encoded = jsonField(value)?;
+      fieldParts = append(fieldParts, encoded);
+    }
+    parts = append(parts, "\"fields\":{" + strings.Join(fieldParts, ",") + "}");
+  }
+  return ok("{" + strings.Join(parts, ",") + "}");
+}
+
+function jsonField(value: Field): Result<string> {
+  const name = encodeJSONString(value.name);
+  const encodedValue = jsonValue(value)?;
+  return ok(name + ":" + encodedValue);
+}
+
+function jsonValue(value: Field): Result<string> {
+  if (value.kind == FieldKind.Integer) {
+    return ok(strconv.Itoa(value.integerValue));
+  }
+  if (value.kind == FieldKind.Integer64) {
+    return ok(strconv.FormatInt(value.integer64Value, 10));
+  }
+  if (value.kind == FieldKind.Number) {
+    return encodeJSONNumber(value.numberValue);
+  }
+  if (value.kind == FieldKind.Boolean) {
+    return ok(strconv.FormatBool(value.booleanValue));
+  }
+  if (value.kind == FieldKind.Group) {
+    return ok(value.groupJSONValue);
+  }
+  return ok(encodeJSONString(value.textValue));
+}
+
+function encodeJSONString(value: string): string {
+  const [encoded, _] = stdjson.Marshal(value);
+  return string(encoded);
+}
+
+function encodeJSONNumber(value: float64): Result<string> {
+  const encoded = stdjson.Marshal(value)?;
+  return ok(string(encoded));
+}

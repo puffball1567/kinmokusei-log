@@ -1,0 +1,22 @@
+import { Integer, Level, Options, Text, json } from "../../log";
+import go fmt from "fmt";
+import go os from "os";
+
+function main(): void {
+  const options = Options {
+    minimumLevel: Level.Info,
+    includeTime: false,
+  };
+  const [logger, loggerError] = json(os.Stdout, options);
+  if (loggerError !== nil) {
+    fmt.Println("error:", loggerError.Error());
+    return;
+  }
+  const [writeError] = logger.info("worker ready", [
+    Text("queue", "emails"),
+    Integer("workers", 4),
+  ]);
+  if (writeError !== nil) {
+    fmt.Println("error:", writeError.Error());
+  }
+}

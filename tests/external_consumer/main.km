@@ -1,0 +1,19 @@
+import { Boolean, Level, Options, Text, json } from "kinmokusei-log";
+import go fmt from "fmt";
+import go os from "os";
+
+function main(): void {
+  const [logger, loggerError] = json(os.Stdout, Options {
+    minimumLevel: Level.Info,
+    includeTime: false,
+  });
+  if (loggerError !== nil) {
+    fmt.Println("error:", loggerError.Error());
+    return;
+  }
+  const service = logger.withFields([Text("service", "consumer")]);
+  const [writeError] = service.info("started", [Boolean("ready", true)]);
+  if (writeError !== nil) {
+    fmt.Println("error:", writeError.Error());
+  }
+}

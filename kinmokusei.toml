@@ -1,0 +1,14 @@
+[project]
+name = "kinmokusei-log"
+version = "0.1.0"
+go-module = "github.com/puffball1567/kinmokusei-log"
+go-version = "1.23"
+
+[package]
+entry = "log.km"
+min-kinmokusei = "0.4.3"
+backend = "go"
+license = "Apache-2.0"
+
+[target]
+cgo = "disabled"

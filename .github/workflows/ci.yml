@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+          cache: false
+      - name: Install Kinmokusei
+        run: go install github.com/puffball1567/kinmokusei/cmd/keika@v0.4.3
+      - name: Test
+        run: KEIKA="$(go env GOPATH)/bin/keika" sh scripts/test.sh

@@ -1,0 +1,15 @@
+{
+  "lockVersion": 4,
+  "manifestHash": "sha256:b0a006f5a1f81bf513769cf7c86d64eddc0c6c045e8e42789b03f0412587d22a",
+  "goVersion": "1.23",
+  "target": {
+    "goos": "linux",
+    "goarch": "amd64",
+    "cgoEnabled": false,
+    "tags": []
+  },
+  "goModHash": "sha256:532858523a0b40289c4c1e37e5dd8b8d7def2e376238b14212fab8cc554aa755",
+  "goSumHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "modules": null,
+  "goMod": "module github.com/puffball1567/kinmokusei-log\n\ngo 1.23\n"
+}
