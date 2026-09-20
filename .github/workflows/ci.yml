@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  test-matrix:
     name: ${{ matrix.os }} / Go ${{ matrix.go }}
     strategy:
       fail-fast: false
@@ -38,3 +38,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: KEIKA="$(go env GOPATH)/bin/keika.exe" sh scripts/test.sh
+
+  test:
+    if: always()
+    needs: test-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful test matrix
+        run: test "${{ needs.test-matrix.result }}" = success
