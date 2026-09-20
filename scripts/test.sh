@@ -28,6 +28,7 @@ if [ "$coverage_total" != "100.0%" ]; then
 fi
 GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzJSONLoggingNeverPanicsAndStaysValid$' -fuzztime=1s
 GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzTextLoggingNeverPanics$' -fuzztime=1s
+GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzGroupValidationNeverPanics$' -fuzztime=1s
 
 cd "$project_dir"
 "$keika_command" build -o "$test_dir/basic-example" examples/basic/main.km

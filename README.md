@@ -21,10 +21,17 @@ runtime dependencies.
 - Optional UTC timestamps in RFC3339Nano format
 - Complete-record locking for safe concurrent writes
 - Writer, short-write, and JSON encoding errors returned as `Result<void>`
+- Portable field-name validation and duplicate-key rejection
 - No implicit process exit for error-level logs
 
 JSON records keep user fields under a `fields` object. This prevents a caller
 field named `message`, `level`, or `time` from replacing record metadata.
+
+Field names use `[A-Za-z_][A-Za-z0-9_.-]*`. A record returns an error before
+writing when a field name is invalid or when persistent and record fields
+contain the same name. Groups enforce the same rules for their children.
+Filtered records intentionally skip validation, encoding, locking, and writer
+access entirely.
 
 ## Installation
 
@@ -102,8 +109,9 @@ Groups are nested JSON objects. In text output they use a compact
 
 ## Development
 
-Run source checks, 100% generated-Go statement coverage, the race detector,
-two fuzz targets, both examples, and an independent short-import consumer:
+Run source checks, the complete level/field/group/writer/concurrency matrix,
+100% generated-Go statement coverage, the race detector, three fuzz targets,
+both examples, and an independent short-import consumer:
 
 ```sh
 KEIKA=keika sh scripts/test.sh

@@ -1,5 +1,6 @@
 import go stdjson from "encoding/json";
 import go errors from "errors";
+import go fmt from "fmt";
 import go io from "io";
 import go os from "os";
 import go strconv from "strconv";
@@ -81,6 +82,8 @@ export function Error(name: string, value: error): Field {
 }
 
 export function Group(name: string, fields: Field[]): Result<Field> {
+  validateFieldName(name)?;
+  validateFields(fields)?;
   let textParts: string[] = [];
   let jsonParts: string[] = [];
   for (const value of fields) {
@@ -118,6 +121,7 @@ export class Logger {
     for (const value of fields) {
       combined = append(combined, value);
     }
+    validateFields(combined)?;
 
     let line = "";
     if (this.outputKind == OutputKind.JSON) {
@@ -206,6 +210,38 @@ function copyFields(source: Field[]): Field[] {
     copied = append(copied, value);
   }
   return copied;
+}
+
+function validateFields(fields: Field[]): Result<void> {
+  const names = makeMap[string, boolean]();
+  for (const value of fields) {
+    validateFieldName(value.name)?;
+    const [_, duplicate] = names[value.name];
+    if (duplicate) {
+      return fail(fmt.Errorf("duplicate log field name %q", value.name));
+    }
+    names[value.name] = true;
+  }
+  return ok();
+}
+
+function validateFieldName(name: string): Result<void> {
+  if (len(name) == 0) {
+    return fail(errors.New("log field name must not be empty"));
+  }
+  for (let index = 0; index < len(name); index++) {
+    const character = name[index:index + 1];
+    const letter = (character >= "a" && character <= "z") || (character >= "A" && character <= "Z");
+    const digit = character >= "0" && character <= "9";
+    if (index == 0) {
+      if (!letter && character != "_") {
+        return fail(fmt.Errorf("invalid log field name %q", name));
+      }
+    } else if (!letter && !digit && character != "_" && character != "." && character != "-") {
+      return fail(fmt.Errorf("invalid log field name %q", name));
+    }
+  }
+  return ok();
 }
 
 function levelRank(level: Level): int {
