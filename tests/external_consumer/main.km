@@ -11,7 +11,11 @@ function main(): void {
     fmt.Println("error:", loggerError.Error());
     return;
   }
-  const service = logger.withFields([Text("service", "consumer")]);
+  const [service, contextError] = logger.withFields([Text("service", "consumer")]);
+  if (contextError !== nil) {
+    fmt.Println("error:", contextError.Error());
+    return;
+  }
   const [writeError] = service.info("started", [Boolean("ready", true)]);
   if (writeError !== nil) {
     fmt.Println("error:", writeError.Error());

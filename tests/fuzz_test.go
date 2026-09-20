@@ -71,3 +71,36 @@ func FuzzGroupValidationNeverPanics(f *testing.F) {
 		}
 	})
 }
+
+func FuzzSecretAlwaysRedacted(f *testing.F) {
+	f.Add("secret")
+	f.Add("金木犀\n\"token")
+	f.Add("")
+	f.Fuzz(func(t *testing.T, secret string) {
+		for _, format := range []string{"text", "json"} {
+			var output bytes.Buffer
+			var logger *Logger
+			if format == "json" {
+				logger = mustJSONLogger(t, &output, noTime(LevelInfo))
+			} else {
+				logger = mustTextLogger(t, &output, noTime(LevelInfo))
+			}
+			if err := logger.Info("redaction", []Field{Secret("secret", secret)}); err != nil {
+				t.Fatal(err)
+			}
+			if format == "json" {
+				var record struct {
+					Fields map[string]any `json:"fields"`
+				}
+				if err := stdjson.Unmarshal(output.Bytes(), &record); err != nil {
+					t.Fatal(err)
+				}
+				if got := record.Fields["secret"]; got != "[REDACTED]" {
+					t.Fatalf("secret field = %#v", got)
+				}
+			} else if got, want := output.String(), "level=INFO message=\"redaction\" secret=\"[REDACTED]\"\n"; got != want {
+				t.Fatalf("text output = %q, want %q", got, want)
+			}
+		}
+	})
+}

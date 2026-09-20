@@ -3,6 +3,7 @@ import go errors from "errors";
 import go fmt from "fmt";
 import go io from "io";
 import go os from "os";
+import go reflect from "reflect";
 import go strconv from "strconv";
 import go strings from "strings";
 import go sync from "sync";
@@ -74,8 +75,20 @@ export function Boolean(name: string, value: boolean): Field {
   return field(name, FieldKind.Boolean, "", 0, 0, 0.0, value, "", "");
 }
 
+export function Duration(name: string, value: time.Duration): Field {
+  return Text(name, value.String());
+}
+
+export function Timestamp(name: string, value: time.Time): Field {
+  return Text(name, value.UTC().Format(time.RFC3339Nano));
+}
+
+export function Secret(name: string, value: string): Field {
+  return Text(name, "[REDACTED]");
+}
+
 export function Error(name: string, value: error): Field {
-  if (value === nil) {
+  if (errorIsNil(value)) {
     return field(name, FieldKind.Error, "<nil>", 0, 0, 0.0, false, "", "");
   }
   return field(name, FieldKind.Error, value.Error(), 0, 0, 0.0, false, "", "");
@@ -160,17 +173,18 @@ export class Logger {
     return this.log(Level.Error, message, fields);
   }
 
-  public function withFields(fields: Field[]): Logger {
+  public function withFields(fields: Field[]): Result<Logger> {
     let combined = copyFields(this.fields);
     for (const value of fields) {
       combined = append(combined, value);
     }
-    return new Logger(this.writer, this.mutex, this.outputKind, this.options, combined);
+    validateFields(combined)?;
+    return ok(new Logger(this.writer, this.mutex, this.outputKind, this.options, combined));
   }
 }
 
 export function text(writer: io.Writer, options: Options): Result<Logger> {
-  if (writer === nil) {
+  if (writerIsNil(writer)) {
     return fail(errors.New("log writer must not be nil"));
   }
   const mutex = sync.Mutex {};
@@ -178,7 +192,7 @@ export function text(writer: io.Writer, options: Options): Result<Logger> {
 }
 
 export function json(writer: io.Writer, options: Options): Result<Logger> {
-  if (writer === nil) {
+  if (writerIsNil(writer)) {
     return fail(errors.New("log writer must not be nil"));
   }
   const mutex = sync.Mutex {};
@@ -188,6 +202,30 @@ export function json(writer: io.Writer, options: Options): Result<Logger> {
 export function stderr(options: Options): Logger {
   const [logger, _] = text(os.Stderr, options);
   return logger;
+}
+
+function writerIsNil(writer: io.Writer): boolean {
+  if (writer === nil) {
+    return true;
+  }
+  const value = reflect.ValueOf(writer);
+  const kind = value.Kind();
+  if (kind == reflect.Chan || kind == reflect.Func || kind == reflect.Interface || kind == reflect.Map || kind == reflect.Ptr || kind == reflect.Slice) {
+    return value.IsNil();
+  }
+  return false;
+}
+
+function errorIsNil(value: error): boolean {
+  if (value === nil) {
+    return true;
+  }
+  const reflected = reflect.ValueOf(value);
+  const kind = reflected.Kind();
+  if (kind == reflect.Chan || kind == reflect.Func || kind == reflect.Interface || kind == reflect.Map || kind == reflect.Ptr || kind == reflect.Slice) {
+    return reflected.IsNil();
+  }
+  return false;
 }
 
 function field(name: string, kind: FieldKind, textValue: string, integerValue: int, integer64Value: int64, numberValue: float64, booleanValue: boolean, groupTextValue: string, groupJSONValue: string): Field {

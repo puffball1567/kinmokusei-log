@@ -16,11 +16,13 @@ runtime dependencies.
 - Minimum-level filtering before encoding or writing
 - Human-readable text and machine-readable JSON output
 - Text, integer, 64-bit integer, floating-point, boolean, and error fields
+- Duration, UTC timestamp, and always-redacted secret convenience fields
 - Nested structured groups
 - Persistent fields through independent child loggers
 - Optional UTC timestamps in RFC3339Nano format
 - Complete-record locking for safe concurrent writes
 - Writer, short-write, and JSON encoding errors returned as `Result<void>`
+- Nil and typed-nil writers rejected at construction
 - Portable field-name validation and duplicate-key rejection
 - No implicit process exit for error-level logs
 
@@ -46,7 +48,7 @@ import { Boolean, Level, Options, Text, json } from "kinmokusei-log";
 ## Example
 
 ```ts
-import { Boolean, Integer, Level, Options, Text, json } from "kinmokusei-log";
+import { Boolean, Integer, Level, Options, Secret, Text, json } from "kinmokusei-log";
 import go fmt from "fmt";
 import go os from "os";
 
@@ -60,10 +62,15 @@ function main(): void {
     return;
   }
 
-  const service = logger.withFields([Text("service", "worker")]);
+  const [service, contextError] = logger.withFields([Text("service", "worker")]);
+  if (contextError !== nil) {
+    fmt.Println("error:", contextError.Error());
+    return;
+  }
   const [writeError] = service.info("job completed", [
     Integer("job_id", 42),
     Boolean("cached", false),
+    Secret("api_token", "never emitted"),
   ]);
   if (writeError !== nil) {
     fmt.Println("error:", writeError.Error());
@@ -74,7 +81,7 @@ function main(): void {
 The output is one JSON object per line:
 
 ```json
-{"time":"2026-09-20T04:30:00Z","level":"INFO","message":"job completed","fields":{"service":"worker","job_id":42,"cached":false}}
+{"time":"2026-09-20T04:30:00Z","level":"INFO","message":"job completed","fields":{"service":"worker","job_id":42,"cached":false,"api_token":"[REDACTED]"}}
 ```
 
 ## Field groups
@@ -99,8 +106,12 @@ Groups are nested JSON objects. In text output they use a compact
 - `enabled(level)` reports whether a record would pass the minimum level.
 - `log(level, message, fields)` handles a dynamic level.
 - `debug`, `info`, `warn`, and `error` are convenience methods.
-- `withFields(fields)` creates an independent child logger. It shares the
-  writer lock while keeping the parent context unchanged.
+- `withFields(fields)` validates all persistent fields immediately and returns
+  an independent child logger as `Result<Logger>`. It shares the writer lock
+  while keeping the parent context unchanged.
+- `Duration` uses Go's canonical duration representation, `Timestamp`
+  normalizes to UTC RFC3339Nano, and `Secret` discards its input immediately
+  and stores only `[REDACTED]`.
 - Filtered records are not encoded and do not touch the writer.
 - Every emitted record is assembled before the lock is taken and written with
   one writer call. Multiple related loggers can therefore safely share output.
@@ -109,9 +120,10 @@ Groups are nested JSON objects. In text output they use a compact
 
 ## Development
 
-Run source checks, the complete level/field/group/writer/concurrency matrix,
-100% generated-Go statement coverage, the race detector, three fuzz targets,
-both examples, and an independent short-import consumer:
+Run source checks, static analysis, the complete
+level/field/group/writer/concurrency matrix, 100% generated-Go statement
+coverage, the race detector, four fuzz targets, both examples, and an
+independent short-import consumer:
 
 ```sh
 KEIKA=keika sh scripts/test.sh

@@ -20,7 +20,11 @@ function main(): void {
     fmt.Println("error:", groupError.Error());
     return;
   }
-  const application = logger.withFields([Text("component", "api")]);
+  const [application, contextError] = logger.withFields([Text("component", "api")]);
+  if (contextError !== nil) {
+    fmt.Println("error:", contextError.Error());
+    return;
+  }
   const [writeError] = application.info("request completed", [request, Boolean("cached", true)]);
   if (writeError !== nil) {
     fmt.Println("error:", writeError.Error());

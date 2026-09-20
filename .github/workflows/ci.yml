@@ -9,14 +9,32 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Go ${{ matrix.go }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            go: "1.23.x"
+          - os: macos-latest
+            go: "1.23.x"
+          - os: windows-latest
+            go: "1.23.x"
+          - os: ubuntu-latest
+            go: stable
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23.x"
+          go-version: ${{ matrix.go }}
           cache: false
       - name: Install Kinmokusei
         run: go install github.com/puffball1567/kinmokusei/cmd/keika@v0.4.3
       - name: Test
+        if: runner.os != 'Windows'
         run: KEIKA="$(go env GOPATH)/bin/keika" sh scripts/test.sh
+      - name: Test on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: KEIKA="$(go env GOPATH)/bin/keika.exe" sh scripts/test.sh

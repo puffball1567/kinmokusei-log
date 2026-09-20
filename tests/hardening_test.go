@@ -109,7 +109,16 @@ func TestDuplicateFieldMatrix(t *testing.T) {
 				} else {
 					root = mustTextLogger(t, &output, noTime(LevelInfo))
 				}
-				logger := root.WithFields(test.base)
+				logger, contextErr := root.WithFields(test.base)
+				if contextErr != nil {
+					if test.name != "base duplicate" || !strings.Contains(contextErr.Error(), "duplicate log field name") {
+						t.Fatalf("WithFields() error = %v", contextErr)
+					}
+					if output.Len() != 0 {
+						t.Fatalf("invalid persistent fields wrote %q", output.String())
+					}
+					return
+				}
 				err := logger.Info("duplicate", test.record)
 				if err == nil || !strings.Contains(err.Error(), "duplicate log field name") {
 					t.Fatalf("Info() error = %v", err)
@@ -119,6 +128,26 @@ func TestDuplicateFieldMatrix(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestWithFieldsRejectsInvalidContextImmediately(t *testing.T) {
+	for _, format := range []string{"text", "json"} {
+		t.Run(format, func(t *testing.T) {
+			var output bytes.Buffer
+			var root *Logger
+			if format == "json" {
+				root = mustJSONLogger(t, &output, noTime(LevelInfo))
+			} else {
+				root = mustTextLogger(t, &output, noTime(LevelInfo))
+			}
+			if child, err := root.WithFields([]Field{Text("bad name", "value")}); err == nil || child != nil {
+				t.Fatalf("WithFields(invalid) = (%v, %v)", child, err)
+			}
+			if output.Len() != 0 {
+				t.Fatalf("invalid context wrote %q", output.String())
+			}
+		})
 	}
 }
 
@@ -291,10 +320,10 @@ func TestConcurrentTextWritesRemainWholeLines(t *testing.T) {
 	var output bytes.Buffer
 	root := mustTextLogger(t, &output, noTime(LevelDebug))
 	children := []*Logger{
-		root.WithFields([]Field{Text("worker", "a")}),
-		root.WithFields([]Field{Text("worker", "b")}),
-		root.WithFields([]Field{Text("worker", "c")}),
-		root.WithFields([]Field{Text("worker", "d")}),
+		mustWithFields(t, root, []Field{Text("worker", "a")}),
+		mustWithFields(t, root, []Field{Text("worker", "b")}),
+		mustWithFields(t, root, []Field{Text("worker", "c")}),
+		mustWithFields(t, root, []Field{Text("worker", "d")}),
 	}
 	const records = 100
 	var wait sync.WaitGroup

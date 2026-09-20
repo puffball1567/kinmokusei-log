@@ -20,6 +20,7 @@ cp tests/*_test.go "$generated_dir/"
 
 cd "$generated_dir"
 go mod init example.com/kinmokusei-log-test >/dev/null
+GOCACHE="$go_cache" go vet ./...
 GOCACHE="$go_cache" go test -count=1 -race -coverprofile=coverage.out ./...
 coverage_total=$(GOCACHE="$go_cache" go tool cover -func=coverage.out | awk '/^total:/ { print $3 }')
 if [ "$coverage_total" != "100.0%" ]; then
@@ -29,6 +30,7 @@ fi
 GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzJSONLoggingNeverPanicsAndStaysValid$' -fuzztime=1s
 GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzTextLoggingNeverPanics$' -fuzztime=1s
 GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzGroupValidationNeverPanics$' -fuzztime=1s
+GOCACHE="$go_cache" go test -run='^$' -fuzz='^FuzzSecretAlwaysRedacted$' -fuzztime=1s
 
 cd "$project_dir"
 "$keika_command" build -o "$test_dir/basic-example" examples/basic/main.km

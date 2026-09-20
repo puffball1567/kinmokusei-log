@@ -35,6 +35,15 @@ func mustJSONLogger(t *testing.T, writer io.Writer, options Options) *Logger {
 	return logger
 }
 
+func mustWithFields(t *testing.T, logger *Logger, fields []Field) *Logger {
+	t.Helper()
+	child, err := logger.WithFields(fields)
+	if err != nil {
+		t.Fatalf("WithFields() error = %v", err)
+	}
+	return child
+}
+
 func TestDefaultOptions(t *testing.T) {
 	got := defaultOptions()
 	if got.MinimumLevel != LevelInfo || !got.IncludeTime {
@@ -166,9 +175,9 @@ func TestWithFieldsIsIndependentAndComposable(t *testing.T) {
 	var output bytes.Buffer
 	root := mustTextLogger(t, &output, noTime(LevelDebug))
 	input := []Field{Text("component", "api")}
-	child := root.WithFields(input)
+	child := mustWithFields(t, root, input)
 	input[0] = Text("component", "mutated")
-	grandchild := child.WithFields([]Field{Integer("request_id", 42)})
+	grandchild := mustWithFields(t, child, []Field{Integer("request_id", 42)})
 
 	if err := root.Info("root", nil); err != nil {
 		t.Fatal(err)
@@ -275,7 +284,7 @@ func TestJSONRejectsUnsupportedNumber(t *testing.T) {
 
 func TestConcurrentWritesRemainWholeLines(t *testing.T) {
 	var output bytes.Buffer
-	logger := mustJSONLogger(t, &output, noTime(LevelDebug)).WithFields([]Field{Text("component", "worker")})
+	logger := mustWithFields(t, mustJSONLogger(t, &output, noTime(LevelDebug)), []Field{Text("component", "worker")})
 	const workers = 16
 	const messages = 50
 	var wait sync.WaitGroup
