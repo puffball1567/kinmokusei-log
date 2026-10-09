@@ -2,13 +2,53 @@ name: CI
 
 on:
   push:
+    branches: [devel]
+    tags: ["v*"]
   pull_request:
+    branches: [devel, main]
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
+  classify-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test branch flow policy
+        run: sh scripts/branch_flow.sh self-test
+      - name: Classify branch flow
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mode=$(sh scripts/branch_flow.sh classify "$EVENT_NAME" "$BASE_REF" "$HEAD_REF" "$HEAD_REPOSITORY" "$REPOSITORY")
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+  verify-promotion:
+    needs: classify-flow
+    if: ${{ needs.classify-flow.outputs.mode == 'promotion' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify current devel passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIBRARY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: sh scripts/branch_flow.sh verify-promotion
+
   test-matrix:
+    needs: classify-flow
+    if: ${{ needs.classify-flow.outputs.mode == 'full' }}
     name: ${{ matrix.os }} / Go ${{ matrix.go }}
     strategy:
       fail-fast: false
@@ -39,10 +79,31 @@ jobs:
         shell: bash
         run: KEIKA="$(go env GOPATH)/bin/keika.exe" sh scripts/test.sh
 
+
   test:
-    if: always()
-    needs: test-matrix
+    name: test
+    if: ${{ always() }}
+    needs: [classify-flow, verify-promotion, test-matrix]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Require successful test matrix
-        run: test "${{ needs.test-matrix.result }}" = success
+      - name: Require successful branch checks
+        env:
+          CLASSIFICATION: ${{ needs.classify-flow.result }}
+          MODE: ${{ needs.classify-flow.outputs.mode }}
+          PROMOTION: ${{ needs.verify-promotion.result }}
+          RESULT_0: ${{ needs.test-matrix.result }}
+        run: |
+          test "$CLASSIFICATION" = success
+          case "$MODE" in
+            full)
+              test "$RESULT_0" = success
+              ;;
+            promotion)
+              test "$PROMOTION" = success
+              ;;
+            *)
+              echo "::error::Invalid pull request branch flow."
+              exit 1
+              ;;
+          esac
