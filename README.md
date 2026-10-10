@@ -134,3 +134,8 @@ Generated Go is test output and is not maintained as source.
 ## License
 
 Apache-2.0
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, pull request,
+release, and hotfix rules.
