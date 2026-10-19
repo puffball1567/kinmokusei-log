@@ -37,15 +37,15 @@ enum FieldKind {
 }
 
 export struct Field {
-  private name: string;
+  private name: bstring;
   private kind: FieldKind;
-  private textValue: string;
+  private textValue: bstring;
   private integerValue: int;
   private integer64Value: int64;
   private numberValue: float64;
   private booleanValue: boolean;
-  private groupTextValue: string;
-  private groupJSONValue: string;
+  private groupTextValue: bstring;
+  private groupJSONValue: bstring;
 }
 
 export function defaultOptions(): Options {
@@ -55,50 +55,50 @@ export function defaultOptions(): Options {
   };
 }
 
-export function Text(name: string, value: string): Field {
+export function Text(name: bstring, value: bstring): Field {
   return field(name, FieldKind.Text, value, 0, 0, 0.0, false, "", "");
 }
 
-export function Integer(name: string, value: int): Field {
+export function Integer(name: bstring, value: int): Field {
   return field(name, FieldKind.Integer, "", value, 0, 0.0, false, "", "");
 }
 
-export function Integer64(name: string, value: int64): Field {
+export function Integer64(name: bstring, value: int64): Field {
   return field(name, FieldKind.Integer64, "", 0, value, 0.0, false, "", "");
 }
 
-export function Number(name: string, value: float64): Field {
+export function Number(name: bstring, value: float64): Field {
   return field(name, FieldKind.Number, "", 0, 0, value, false, "", "");
 }
 
-export function Boolean(name: string, value: boolean): Field {
+export function Boolean(name: bstring, value: boolean): Field {
   return field(name, FieldKind.Boolean, "", 0, 0, 0.0, value, "", "");
 }
 
-export function Duration(name: string, value: time.Duration): Field {
+export function Duration(name: bstring, value: time.Duration): Field {
   return Text(name, value.String());
 }
 
-export function Timestamp(name: string, value: time.Time): Field {
+export function Timestamp(name: bstring, value: time.Time): Field {
   return Text(name, value.UTC().Format(time.RFC3339Nano));
 }
 
-export function Secret(name: string, value: string): Field {
+export function Secret(name: bstring, value: bstring): Field {
   return Text(name, "[REDACTED]");
 }
 
-export function Error(name: string, value: error): Field {
+export function Error(name: bstring, value: error): Field {
   if (errorIsNil(value)) {
     return field(name, FieldKind.Error, "<nil>", 0, 0, 0.0, false, "", "");
   }
   return field(name, FieldKind.Error, value.Error(), 0, 0, 0.0, false, "", "");
 }
 
-export function Group(name: string, fields: Field[]): Result<Field> {
+export function Group(name: bstring, fields: Field[]): Result<Field> {
   validateFieldName(name)?;
   validateFields(fields)?;
-  let textParts: string[] = [];
-  let jsonParts: string[] = [];
+  let textParts: bstring[] = [];
+  let jsonParts: bstring[] = [];
   for (const value of fields) {
     textParts = append(textParts, textField(value));
     const encoded = jsonField(value)?;
@@ -126,7 +126,7 @@ export class Logger {
     return levelRank(level) >= levelRank(this.options.minimumLevel);
   }
 
-  public function log(level: Level, message: string, fields: Field[]): Result<void> {
+  public function log(level: Level, message: bstring, fields: Field[]): Result<void> {
     if (!this.enabled(level)) {
       return ok();
     }
@@ -136,7 +136,7 @@ export class Logger {
     }
     validateFields(combined)?;
 
-    let line = "";
+    let line: bstring = "";
     if (this.outputKind == OutputKind.JSON) {
       const encoded = encodeJSON(level, message, combined, this.options.includeTime)?;
       line = encoded;
@@ -157,19 +157,19 @@ export class Logger {
     return ok();
   }
 
-  public function debug(message: string, fields: Field[]): Result<void> {
+  public function debug(message: bstring, fields: Field[]): Result<void> {
     return this.log(Level.Debug, message, fields);
   }
 
-  public function info(message: string, fields: Field[]): Result<void> {
+  public function info(message: bstring, fields: Field[]): Result<void> {
     return this.log(Level.Info, message, fields);
   }
 
-  public function warn(message: string, fields: Field[]): Result<void> {
+  public function warn(message: bstring, fields: Field[]): Result<void> {
     return this.log(Level.Warn, message, fields);
   }
 
-  public function error(message: string, fields: Field[]): Result<void> {
+  public function error(message: bstring, fields: Field[]): Result<void> {
     return this.log(Level.Error, message, fields);
   }
 
@@ -228,7 +228,7 @@ function errorIsNil(value: error): boolean {
   return false;
 }
 
-function field(name: string, kind: FieldKind, textValue: string, integerValue: int, integer64Value: int64, numberValue: float64, booleanValue: boolean, groupTextValue: string, groupJSONValue: string): Field {
+function field(name: bstring, kind: FieldKind, textValue: bstring, integerValue: int, integer64Value: int64, numberValue: float64, booleanValue: boolean, groupTextValue: bstring, groupJSONValue: bstring): Field {
   return Field {
     name: name,
     kind: kind,
@@ -251,7 +251,7 @@ function copyFields(source: Field[]): Field[] {
 }
 
 function validateFields(fields: Field[]): Result<void> {
-  const names = makeMap[string, boolean]();
+  const names = makeMap[bstring, boolean]();
   for (const value of fields) {
     validateFieldName(value.name)?;
     const [_, duplicate] = names[value.name];
@@ -263,7 +263,7 @@ function validateFields(fields: Field[]): Result<void> {
   return ok();
 }
 
-function validateFieldName(name: string): Result<void> {
+function validateFieldName(name: bstring): Result<void> {
   if (len(name) == 0) {
     return fail(errors.New("log field name must not be empty"));
   }
@@ -295,7 +295,7 @@ function levelRank(level: Level): int {
   return 3;
 }
 
-function levelName(level: Level): string {
+function levelName(level: Level): bstring {
   if (level == Level.Debug) {
     return "DEBUG";
   }
@@ -308,8 +308,8 @@ function levelName(level: Level): string {
   return "INFO";
 }
 
-function encodeText(level: Level, message: string, fields: Field[], includeTime: boolean): string {
-  let parts: string[] = [];
+function encodeText(level: Level, message: bstring, fields: Field[], includeTime: boolean): bstring {
+  let parts: bstring[] = [];
   if (includeTime) {
     parts = append(parts, "time=" + strconv.Quote(time.Now().UTC().Format(time.RFC3339Nano)));
   }
@@ -321,7 +321,7 @@ function encodeText(level: Level, message: string, fields: Field[], includeTime:
   return strings.Join(parts, " ");
 }
 
-function textField(value: Field): string {
+function textField(value: Field): bstring {
   if (value.kind == FieldKind.Integer) {
     return value.name + "=" + strconv.Itoa(value.integerValue);
   }
@@ -340,8 +340,8 @@ function textField(value: Field): string {
   return value.name + "=" + strconv.Quote(value.textValue);
 }
 
-function encodeJSON(level: Level, message: string, fields: Field[], includeTime: boolean): Result<string> {
-  let parts: string[] = [];
+function encodeJSON(level: Level, message: bstring, fields: Field[], includeTime: boolean): Result<bstring> {
+  let parts: bstring[] = [];
   if (includeTime) {
     const encodedTime = encodeJSONString(time.Now().UTC().Format(time.RFC3339Nano));
     parts = append(parts, "\"time\":" + encodedTime);
@@ -351,7 +351,7 @@ function encodeJSON(level: Level, message: string, fields: Field[], includeTime:
   parts = append(parts, "\"level\":" + encodedLevel);
   parts = append(parts, "\"message\":" + encodedMessage);
   if (len(fields) > 0) {
-    let fieldParts: string[] = [];
+    let fieldParts: bstring[] = [];
     for (const value of fields) {
       const encoded = jsonField(value)?;
       fieldParts = append(fieldParts, encoded);
@@ -361,13 +361,13 @@ function encodeJSON(level: Level, message: string, fields: Field[], includeTime:
   return ok("{" + strings.Join(parts, ",") + "}");
 }
 
-function jsonField(value: Field): Result<string> {
+function jsonField(value: Field): Result<bstring> {
   const name = encodeJSONString(value.name);
   const encodedValue = jsonValue(value)?;
   return ok(name + ":" + encodedValue);
 }
 
-function jsonValue(value: Field): Result<string> {
+function jsonValue(value: Field): Result<bstring> {
   if (value.kind == FieldKind.Integer) {
     return ok(strconv.Itoa(value.integerValue));
   }
@@ -386,12 +386,12 @@ function jsonValue(value: Field): Result<string> {
   return ok(encodeJSONString(value.textValue));
 }
 
-function encodeJSONString(value: string): string {
+function encodeJSONString(value: bstring): bstring {
   const [encoded, _] = stdjson.Marshal(value);
-  return string(encoded);
+  return bstring(encoded);
 }
 
-function encodeJSONNumber(value: float64): Result<string> {
+function encodeJSONNumber(value: float64): Result<bstring> {
   const encoded = stdjson.Marshal(value)?;
-  return ok(string(encoded));
+  return ok(bstring(encoded));
 }

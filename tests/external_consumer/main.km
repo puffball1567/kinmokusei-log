@@ -11,7 +11,8 @@ function main(): void {
     fmt.Println("error:", loggerError.Error());
     return;
   }
-  const [service, contextError] = logger.withFields([Text("service", "consumer")]);
+  const verifiedService: string = "consumer";
+  const [service, contextError] = logger.withFields([Text("service", verifiedService)]);
   if (contextError !== nil) {
     fmt.Println("error:", contextError.Error());
     return;

@@ -70,7 +70,7 @@ jobs:
           go-version: ${{ matrix.go }}
           cache: false
       - name: Install Kinmokusei
-        run: go install github.com/puffball1567/kinmokusei/cmd/keika@v0.4.3
+        run: go install github.com/puffball1567/kinmokusei/cmd/keika@v0.4.8
       - name: Test
         if: runner.os != 'Windows'
         run: KEIKA="$(go env GOPATH)/bin/keika" sh scripts/test.sh
