@@ -1,5 +1,13 @@
 # kinmokusei-log
 
+## Compatibility with Kinmokusei v0.4.7
+
+This minor release requires Kinmokusei v0.4.7 or newer. Text parameters,
+results, and collections use `bstring` to preserve the previous byte-oriented
+behavior of Go strings. Scalar verified `string` arguments can still widen to
+`bstring`; collections must be declared as `bstring[]` or copied explicitly.
+Use checked `string(raw)` conversion when your application needs verified UTF-8.
+
 `kinmokusei-log` is a structured logging library written for Kinmokusei. It
 provides typed fields, text and JSON output, level filtering, persistent
 context, explicit write errors, and concurrency-safe records without external
@@ -7,7 +15,7 @@ runtime dependencies.
 
 ## Requirements
 
-- Kinmokusei v0.4.3 or later
+- Kinmokusei v0.4.7 or later
 - Go 1.23 or later
 
 ## Features
@@ -38,7 +46,7 @@ access entirely.
 ## Installation
 
 ```sh
-keika deps add github.com/puffball1567/kinmokusei-log@v0.1.0
+keika deps add github.com/puffball1567/kinmokusei-log@v0.2.0
 ```
 
 ```ts
@@ -134,3 +142,8 @@ Generated Go is test output and is not maintained as source.
 ## License
 
 Apache-2.0
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, pull request,
+release, and hotfix rules.
