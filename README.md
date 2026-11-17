@@ -1,10 +1,11 @@
 # kinmokusei-log
 
-## Compatibility with Kinmokusei v0.4.7
+## Compiler compatibility
 
-This minor release requires Kinmokusei v0.4.7 or newer. Text parameters,
-results, and collections use `bstring` to preserve the previous byte-oriented
-behavior of Go strings. Scalar verified `string` arguments can still widen to
+Requires Kinmokusei v0.4.7 or newer. CI tests both v0.4.7 and v0.4.12.
+
+Text parameters, results, and collections use `bstring` to preserve the previous
+byte-oriented behavior of Go strings. Scalar verified `string` arguments can still widen to
 `bstring`; collections must be declared as `bstring[]` or copied explicitly.
 Use checked `string(raw)` conversion when your application needs verified UTF-8.
 
@@ -126,16 +127,25 @@ Groups are nested JSON objects. In text output they use a compact
 - Error-level logging does not terminate the process. Application lifecycle
   decisions stay with the application.
 
+`stderr` returns a non-null logger. If the process's standard-error writer has
+been removed, it throws an `Exception` instead of returning a failed result's
+nil payload. Use `text` or `json` for a caller-provided writer and explicit
+`Result<Logger>` error handling.
+
 ## Development
 
 Run source checks, static analysis, the complete
-level/field/group/writer/concurrency matrix, 100% generated-Go statement
+level/field/group/writer/concurrency matrix, 100% source-mapped library statement
 coverage, the race detector, four fuzz targets, both examples, and an
 independent short-import consumer:
 
 ```sh
 KEIKA=keika sh scripts/test.sh
 ```
+
+The coverage gate requires every source-mapped library statement to execute.
+Compiler runtime helpers and injected non-null panic paths are excluded; the
+actual generated Go, including those checks, is used by all tests.
 
 Generated Go is test output and is not maintained as source.
 

@@ -200,7 +200,10 @@ export function json(writer: io.Writer, options: Options): Result<Logger> {
 }
 
 export function stderr(options: Options): Logger {
-  const [logger, _] = text(os.Stderr, options);
+  const [logger, loggerError] = text(os.Stderr, options);
+  if (loggerError !== nil) {
+    throw new Exception(loggerError.Error());
+  }
   return logger;
 }
 
