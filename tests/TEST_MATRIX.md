@@ -12,3 +12,8 @@
 | Writers | exact `Write` and `WriteString` paths | short, negative, and oversized counts | nil/typed-nil rejection; early/late writer errors are returned before short-write checks |
 | Concurrency | shared JSON logger and related text child loggers | 800 JSON and 400 text records | no interleaved or malformed lines; race detector clean |
 | Robustness | fixed regression inputs and static analysis | arbitrary messages, names, values, groups, and secrets | four fuzz targets never panic, emit malformed JSON, or expose secret values |
+
+Compiler compatibility is checked with Kinmokusei v0.4.7 and v0.4.12, including
+source checks, generated-Go tests, executable examples and an independent
+short-import consumer. Coverage requires 100% of source-mapped library statements;
+compiler runtime helpers and injected non-null panic paths are excluded.
