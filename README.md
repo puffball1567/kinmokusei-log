@@ -47,7 +47,7 @@ access entirely.
 ## Installation
 
 ```sh
-keika deps add github.com/puffball1567/kinmokusei-log@v0.2.0
+keika deps add github.com/puffball1567/kinmokusei-log@v0.2.1
 ```
 
 ```ts
