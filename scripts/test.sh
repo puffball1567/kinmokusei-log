@@ -2,7 +2,10 @@
 set -eu
 
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-test_dir=$(mktemp -d)
+# Source maps use paths relative to the generated Go, which must be on the
+# same volume as the Kinmokusei source on Windows.
+mkdir -p "$project_dir/.kinmokusei"
+test_dir=$(mktemp -d "$project_dir/.kinmokusei/test.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 
 keika_command=${KEIKA:-keika}
