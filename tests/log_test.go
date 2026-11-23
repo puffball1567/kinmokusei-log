@@ -4,8 +4,10 @@ import (
 	"bytes"
 	stdjson "encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,6 +50,21 @@ func TestDefaultOptions(t *testing.T) {
 	got := defaultOptions()
 	if got.MinimumLevel != LevelInfo || !got.IncludeTime {
 		t.Fatalf("defaultOptions() = %#v", got)
+	}
+}
+
+func TestStderrRejectsMissingProcessWriter(t *testing.T) {
+	previous := os.Stderr
+	t.Cleanup(func() { os.Stderr = previous })
+	os.Stderr = nil
+	var failure any
+	func() {
+		defer func() { failure = recover() }()
+		stderr(noTime(LevelInfo))
+	}()
+	os.Stderr = previous
+	if failure == nil || !strings.Contains(fmt.Sprint(failure), "log writer must not be nil") {
+		t.Fatalf("stderr() failure = %v", failure)
 	}
 }
 
